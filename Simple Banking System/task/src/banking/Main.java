@@ -13,8 +13,7 @@ public class Main {
 
 class BankingSystem {
     private final Scanner scanner = new Scanner(System.in);
-    Map<Long, Integer> keyMap = new HashMap<>();
-    private int balance;
+    private final Map<Long, Integer> keyMap = new HashMap<>();
 
     void printStartMenu() {
         System.out.println("1. Create account\n" +
@@ -60,16 +59,15 @@ class BankingSystem {
 
     private void createAnAccount() {
 
-        long currentCardNumber = generateCardNumber();
-        int currentPassword = generatePIN();
+        CreditCard card = new CreditCard();
 
         System.out.printf("\nYour card have been created\n" +
                 "Your card number:\n" +
                 "%s\n" +
                 "Your card PIN:\n" +
-                "%d\n\n", currentCardNumber, currentPassword);
+                "%d\n\n", card.getCardNumber(), card.getPIN());
 
-        keyMap.put(currentCardNumber, currentPassword);
+        keyMap.put(card.getCardNumber(), card.getPIN());
         printStartMenu();
     }
 
@@ -101,9 +99,47 @@ class BankingSystem {
     private void exit() {
         System.out.println("\nBye!");
     }
+}
+
+class CreditCard {
+    private final long cardNumber;
+    private final int PIN;
+
+    public CreditCard() {
+        this.cardNumber = generateCardNumber();
+        this.PIN = generatePIN();
+    }
+
+    public long getCardNumber() {
+        return cardNumber;
+    }
+
+    public int getPIN() {
+        return PIN;
+    }
 
     private Long generateCardNumber() {
-        return Long.parseLong("400000" + generateRandomKey(9) + 9);
+        String cardNumber = "400000" + generateRandomKey(9);
+        return Long.parseLong(cardNumber + getControlNumber(cardNumber));
+    }
+
+    private int getControlNumber(String cardNumber) {
+
+        int sum = 0;
+        String[] arrayNumbers = cardNumber.split("");
+
+        for (int i = 0; i < arrayNumbers.length; i++) {
+            int digit = Integer.parseInt(arrayNumbers[i]);
+            digit = i % 2 == 0 ? digit * 2 : digit;
+
+            if (digit > 9)
+                sum += digit - 9;
+            else
+                sum += digit;
+        }
+
+        int controlNumber = 10 - sum % 10;
+        return controlNumber == 10 ? 0 : controlNumber;
     }
 
     private int generatePIN() {
@@ -113,7 +149,7 @@ class BankingSystem {
     private String generateRandomKey(int length) {
         StringBuilder randomKey = new StringBuilder();
         for (int i = 0; i < length; i++) {
-            randomKey.append((int) (Math.random() * 10));
+            randomKey.append(((int) (Math.random() * 10)));
         }
         return randomKey.toString();
     }
