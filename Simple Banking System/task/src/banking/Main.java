@@ -1,5 +1,9 @@
 package banking;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -153,4 +157,49 @@ class CreditCard {
         }
         return randomKey.toString();
     }
+}
+
+class BankingDB {
+
+    private final String url;
+    private Connection connection = null;
+    private Statement statement = null;
+    private String query;
+
+    BankingDB(String fileName) {
+        this.url = "jdbc:sqlite:./" + fileName;
+    }
+
+    private Connection connection() {
+        try {
+            connection = DriverManager.getConnection(url);
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+
+        return connection;
+    }
+
+    public void closeConnection() {
+        try {
+            connection.close();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+    private void createCardTable () {
+        query = "CREATE TABLE card (\n" +
+                "\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
+                "\tnumber TEXT NOT NULL,\n" +
+                "\tpin TEXT NOT NULL,\n" +
+                "\tbalance INTEGER DEFAULT 0\n" +
+                ");";
+        try {
+            statement = connection.createStatement();
+            statement.execute(query);
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
 }
