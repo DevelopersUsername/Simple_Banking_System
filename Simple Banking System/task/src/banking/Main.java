@@ -1,23 +1,37 @@
 package banking;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        BankingSystem bankingSystem = new BankingSystem();
+
+        BankingSystem bankingSystem = new BankingSystem(getDataBasePatch(args));
         bankingSystem.printStartMenu();
+    }
+
+    static String getDataBasePatch(String[] args) {
+        String patch = "";
+        for (int i = 0; i < args.length; i++) {
+            if ("-fileName".equals(args[i])) {
+                patch = args[i + 1];
+            }
+        }
+        return patch;
     }
 }
 
 class BankingSystem {
+
     private final Scanner scanner = new Scanner(System.in);
-    private final Map<Long, Integer> keyMap = new HashMap<>();
+    private final Map<String, String> keyMap = new HashMap<>();
+    private final BankingDB bankingDB;
+
+    public BankingSystem(String dataBasePatch) {
+        this.bankingDB = new BankingDB(dataBasePatch);
+    }
 
     void printStartMenu() {
         System.out.println("1. Create account\n" +
@@ -69,19 +83,20 @@ class BankingSystem {
                 "Your card number:\n" +
                 "%s\n" +
                 "Your card PIN:\n" +
-                "%d\n\n", card.getCardNumber(), card.getPIN());
+                "%s\n\n", card.getCardNumber(), card.getPIN());
 
         keyMap.put(card.getCardNumber(), card.getPIN());
+        bankingDB.createCreditCard(card.getCardNumber(), card.getPIN());
         printStartMenu();
     }
 
     private void logIntoAccount() {
         System.out.println("\nEnter your card number:");
-        long enterLogin = Long.parseLong(scanner.nextLine());
+        String enterLogin = scanner.nextLine();
         System.out.println("Enter your PIN:");
-        int enterPIN = Integer.parseInt(scanner.nextLine());
+        String enterPIN = scanner.nextLine();
 
-        if (keyMap.getOrDefault(enterLogin, -1) == enterPIN) {
+        if (keyMap.getOrDefault(enterLogin, "-1").equals(enterPIN)) {
             System.out.println("\nYou have successfully logged in!");
             printAccountMenu();
         } else {
@@ -101,30 +116,32 @@ class BankingSystem {
     }
 
     private void exit() {
+        bankingDB.closeConnection();
         System.out.println("\nBye!");
     }
 }
 
 class CreditCard {
-    private final long cardNumber;
-    private final int PIN;
+
+    private final String cardNumber;
+    private final String PIN;
 
     public CreditCard() {
         this.cardNumber = generateCardNumber();
         this.PIN = generatePIN();
     }
 
-    public long getCardNumber() {
+    public String getCardNumber() {
         return cardNumber;
     }
 
-    public int getPIN() {
+    public String getPIN() {
         return PIN;
     }
 
-    private Long generateCardNumber() {
+    private String generateCardNumber() {
         String cardNumber = "400000" + generateRandomKey(9);
-        return Long.parseLong(cardNumber + getControlNumber(cardNumber));
+        return cardNumber + getControlNumber(cardNumber);
     }
 
     private int getControlNumber(String cardNumber) {
@@ -146,8 +163,8 @@ class CreditCard {
         return controlNumber == 10 ? 0 : controlNumber;
     }
 
-    private int generatePIN() {
-        return Integer.parseInt(generateRandomKey(4));
+    private String generatePIN() {
+        return generateRandomKey(4);
     }
 
     private String generateRandomKey(int length) {
@@ -161,16 +178,15 @@ class CreditCard {
 
 class BankingDB {
 
-    private final String url;
-    private Connection connection = null;
-    private Statement statement = null;
+    private Connection connection;
     private String query;
 
-    BankingDB(String fileName) {
-        this.url = "jdbc:sqlite:./" + fileName;
+    BankingDB(String dataBasePatch) {
+        this.connection = connection("jdbc:sqlite:./" + dataBasePatch);
+        createCardTable();
     }
 
-    private Connection connection() {
+    private Connection connection(String url) {
         try {
             connection = DriverManager.getConnection(url);
         } catch (SQLException e) {
@@ -187,6 +203,7 @@ class BankingDB {
             System.out.println(e.getMessage());
         }
     }
+
     private void createCardTable () {
         query = "CREATE TABLE card (\n" +
                 "\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
@@ -195,11 +212,23 @@ class BankingDB {
                 "\tbalance INTEGER DEFAULT 0\n" +
                 ");";
         try {
-            statement = connection.createStatement();
+            Statement statement = connection.createStatement();
             statement.execute(query);
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
     }
 
+    void createCreditCard(String cardNumber, String PIN) {
+        query = "INSERT INTO card (number, pin, balance) VALUES (?, ?, ?);";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, cardNumber);
+            preparedStatement.setString(2, PIN);
+            preparedStatement.setInt(3, 0);
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
 }
