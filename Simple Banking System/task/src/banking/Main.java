@@ -1,8 +1,6 @@
 package banking;
 
 import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
@@ -26,8 +24,8 @@ public class Main {
 class BankingSystem {
 
     private final Scanner scanner = new Scanner(System.in);
-    private final Map<String, String> keyMap = new HashMap<>();
     private final BankingDB bankingDB;
+    private CreditCard creditCard;
 
     public BankingSystem(String dataBasePatch) {
         this.bankingDB = new BankingDB(dataBasePatch);
@@ -56,7 +54,10 @@ class BankingSystem {
 
     void printAccountMenu() {
         System.out.println("\n1. Balance\n" +
-                "2. Log out\n" +
+                "2. Add income\n" +
+                "3. Do transfer\n" +
+                "4. Close account\n" +
+                "5. Log out\n" +
                 "0. Exit");
 
         switch (Integer.parseInt(scanner.nextLine())) {
@@ -64,6 +65,15 @@ class BankingSystem {
                 getBalance();
                 break;
             case 2:
+                addIncome();
+                break;
+            case 3:
+                doTransfer();
+                break;
+            case 4:
+                closeAccount();
+                break;
+            case 5:
                 logOutAccount();
                 break;
             case 0:
@@ -77,16 +87,15 @@ class BankingSystem {
 
     private void createAnAccount() {
 
-        CreditCard card = new CreditCard();
+        this.creditCard = new CreditCard();
 
         System.out.printf("\nYour card have been created\n" +
                 "Your card number:\n" +
                 "%s\n" +
                 "Your card PIN:\n" +
-                "%s\n\n", card.getCardNumber(), card.getPIN());
+                "%s\n\n", creditCard.getCardNumber(), creditCard.getPIN());
 
-        keyMap.put(card.getCardNumber(), card.getPIN());
-        bankingDB.createCreditCard(card.getCardNumber(), card.getPIN());
+        bankingDB.createCreditCard(creditCard.getCardNumber(), creditCard.getPIN());
         printStartMenu();
     }
 
@@ -96,7 +105,8 @@ class BankingSystem {
         System.out.println("Enter your PIN:");
         String enterPIN = scanner.nextLine();
 
-        if (keyMap.getOrDefault(enterLogin, "-1").equals(enterPIN)) {
+        creditCard = bankingDB.getCard(enterLogin);
+        if (creditCard.getPIN().equals(enterPIN)) {
             System.out.println("\nYou have successfully logged in!");
             printAccountMenu();
         } else {
@@ -111,8 +121,28 @@ class BankingSystem {
     }
 
     private void getBalance() {
-        System.out.println("\nBalance: 0");
+        System.out.printf("\nBalance: %d\n", creditCard.getBalance());
         printAccountMenu();
+    }
+
+    private void addIncome() {
+
+        System.out.println("\nHow much money you want to add?");
+        int income = Integer.parseInt(scanner.nextLine());
+
+        bankingDB.addIncome(creditCard.getCardNumber(), creditCard.getBalance(), income);
+        creditCard.setBalance(creditCard.getBalance() + income);
+        System.out.println("\nSuccessful!");
+        printAccountMenu();
+    }
+
+    private void doTransfer() {
+
+    }
+
+    private void closeAccount() {
+        bankingDB.deleteCreditCard(creditCard.getCardNumber());
+        printStartMenu();
     }
 
     private void exit() {
@@ -125,10 +155,22 @@ class CreditCard {
 
     private final String cardNumber;
     private final String PIN;
+    private int balance;
 
     public CreditCard() {
         this.cardNumber = generateCardNumber();
         this.PIN = generatePIN();
+        this.balance = 0;
+    }
+
+    public CreditCard(String cardNumber, String PIN, int balance) {
+        this.cardNumber = cardNumber;
+        this.PIN = PIN;
+        this.balance = balance;
+    }
+
+    public void setBalance(int balance) {
+        this.balance = balance;
     }
 
     public String getCardNumber() {
@@ -137,6 +179,10 @@ class CreditCard {
 
     public String getPIN() {
         return PIN;
+    }
+
+    public int getBalance() {
+        return balance;
     }
 
     private String generateCardNumber() {
@@ -227,6 +273,50 @@ class BankingDB {
             preparedStatement.setString(2, PIN);
             preparedStatement.setInt(3, 0);
             preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    void deleteCreditCard(String cardNumber) {
+
+        query = "DELETE FROM card WHERE number = ?;";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, cardNumber);
+            preparedStatement.execute();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    CreditCard getCard(String cardNumber) {
+
+        CreditCard creditCard = null;
+
+        query = "SELECT number, pin, balance FROM card WHERE number = ?;";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, cardNumber);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                creditCard = new CreditCard(resultSet.getString("number"), resultSet.getString("pin"), resultSet.getInt("balance"));
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+
+        return creditCard;
+    }
+
+    void addIncome(String cardNumber, int balance, int income) {
+        query = "UPDATE card SET balance = ? WHERE number = ?;";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setInt(1, income + balance);
+            preparedStatement.setString(2, cardNumber);
+            preparedStatement.execute();
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
