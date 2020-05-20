@@ -106,7 +106,7 @@ class BankingSystem {
         String enterPIN = scanner.nextLine();
 
         creditCard = bankingDB.getCard(enterLogin);
-        if (creditCard.getPIN().equals(enterPIN)) {
+        if (creditCard != null && creditCard.getPIN().equals(enterPIN)) {
             System.out.println("\nYou have successfully logged in!");
             printAccountMenu();
         } else {
@@ -130,7 +130,7 @@ class BankingSystem {
         System.out.println("\nHow much money you want to add?");
         int income = Integer.parseInt(scanner.nextLine());
 
-        bankingDB.addIncome(creditCard.getCardNumber(), creditCard.getBalance(), income);
+        bankingDB.addIncome(creditCard.getCardNumber(), creditCard.getBalance() + income);
         creditCard.setBalance(creditCard.getBalance() + income);
         System.out.println("\nSuccessful!");
         printAccountMenu();
@@ -138,6 +138,27 @@ class BankingSystem {
 
     private void doTransfer() {
 
+        System.out.println("\nEnter credit card number");
+        String transferCardNumber = scanner.nextLine();
+
+        if (transferCardNumber.equals(creditCard.getCardNumber())) {
+            System.out.println("\nYou can't transfer money to the same account!");
+        } else if (!creditCard.passLuhnAlgorithm(transferCardNumber)) {
+            System.out.println("\nProbably you made mistake in card number. Please try again!");
+        } else if (!bankingDB.cardNumberExist(transferCardNumber)) {
+            System.out.println("\nSuch a card does not exist.");
+        } else {
+            System.out.println("\nHow much money they want to transfer?");
+            int sum = Integer.parseInt(scanner.nextLine());
+
+            bankingDB.addIncome(transferCardNumber, sum);
+            bankingDB.addIncome(creditCard.getCardNumber(), -sum);
+            creditCard.setBalance(creditCard.getBalance() - sum);
+
+            System.out.println("\nSuccessful!");
+        }
+
+        printAccountMenu();
     }
 
     private void closeAccount() {
@@ -219,6 +240,24 @@ class CreditCard {
             randomKey.append(((int) (Math.random() * 10)));
         }
         return randomKey.toString();
+    }
+
+    boolean passLuhnAlgorithm(String verifiedCardNumber) {
+
+        int sum = 0;
+        String[] arrayNumbers = verifiedCardNumber.split("");
+
+        for (int i = 0; i < arrayNumbers.length; i++) {
+            int digit = Integer.parseInt(arrayNumbers[i]);
+            digit = i % 2 == 0 ? digit * 2 : digit;
+
+            if (digit > 9)
+                sum += digit - 9;
+            else
+                sum += digit;
+        }
+
+        return sum % 10 == 0;
     }
 }
 
@@ -310,15 +349,29 @@ class BankingDB {
         return creditCard;
     }
 
-    void addIncome(String cardNumber, int balance, int income) {
+    void addIncome(String cardNumber, int sum) {
         query = "UPDATE card SET balance = ? WHERE number = ?;";
         try {
             PreparedStatement preparedStatement = connection.prepareStatement(query);
-            preparedStatement.setInt(1, income + balance);
+            preparedStatement.setInt(1, sum);
             preparedStatement.setString(2, cardNumber);
             preparedStatement.execute();
         } catch (SQLException e) {
             System.out.println(e.getMessage());
+        }
+    }
+
+    boolean cardNumberExist(String verifiedCardNumber) {
+        query = "SELECT number FROM card WHERE number = ?;";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, verifiedCardNumber);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            return resultSet.next();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+            return false;
         }
     }
 }
